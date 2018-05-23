@@ -150,6 +150,16 @@ int main(int argc, char** argv) try
         // p(i) == the probability the image contains object of class i.
         matrix<float,1,1000> p = sum_rows(mat(snet(images.begin(), images.end())))/num_crops;
 
+        auto start = std::chrono::system_clock::now();
+        int iterations = 10;
+        for(int i = 0; i < iterations; ++i)
+        {
+          snet(images.begin(), images.end());
+        }
+        auto end = std::chrono::system_clock::now();
+        std::chrono::milliseconds duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        std::cout << "Average execution time for single example: " << duration.count() / iterations / num_crops << " milliseconds\n";
+
         win.set_image(img);
         // Print the 5 most probable labels
         for (int k = 0; k < 5; ++k)

@@ -1,4 +1,4 @@
-// The contents of this file are in the public domain. See LICENSE_FOR_EXAMPLE_PROGRAMS.txt
+﻿// The contents of this file are in the public domain. See LICENSE_FOR_EXAMPLE_PROGRAMS.txt
 /*
     This is an example illustrating the use of the deep learning tools from the
     dlib C++ Library.  In it, we will train the venerable LeNet convolutional
@@ -21,6 +21,9 @@
 #include <dlib/dnn.h>
 #include <iostream>
 #include <dlib/data_io.h>
+#include <chrono>
+#include <random>
+#include <numeric>
 
 using namespace std;
 using namespace dlib;
@@ -120,7 +123,7 @@ int main(int argc, char** argv) try
     // Now if we later wanted to recall the network from disk we can simply say:
     // deserialize("mnist_network.dat") >> net;
 
-
+    /*
     // Now let's run the training images through the network.  This statement runs all the
     // images through it and asks the loss layer to convert the network's raw output into
     // labels.  In our case, these labels are the numbers between 0 and 9.
@@ -156,12 +159,40 @@ int main(int argc, char** argv) try
     cout << "testing num_right: " << num_right << endl;
     cout << "testing num_wrong: " << num_wrong << endl;
     cout << "testing accuracy:  " << num_right/(double)(num_right+num_wrong) << endl;
+    */
+    std::mt19937 gen(0);
+    std::uniform_int_distribution<size_t> dist(0, testing_images.size() - 1);
+    auto start = std::chrono::system_clock::now();
+    int iterations = 10000;
+    for(int i = 0; i < iterations; ++i)
+    {
+      net(training_images[dist(gen)]);
+    }
+    auto end = std::chrono::system_clock::now();
+    std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "Average execution time for single example: " << duration.count() / iterations << " microseconds\n";
 
+    const size_t batchsize = 128;
+    std::uniform_int_distribution<size_t> dist2(0, testing_images.size() - batchsize - 1);
+    start = std::chrono::system_clock::now();
+    std::vector<matrix<unsigned char>> batch(batchsize);
+    std::vector<unsigned long>         res(batchsize);
+    int sumres = 0;
+    iterations = 100;
+    for(int i = 0; i < iterations; ++i)
+    {
+      const size_t start = dist2(gen);
+      std::copy(training_images.begin() + start, training_images.begin() + start + batchsize, batch.begin());
+      net(batch.begin(), batch.end(), res.begin());
+    }
+    end = std::chrono::system_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "Average execution time for batches of 128: " << duration.count() / iterations / batchsize << " microseconds" << endl;
 
     // Finally, you can also save network parameters to XML files if you want to do
     // something with the network in another tool.  For example, you could use dlib's
     // tools/convert_dlib_nets_to_caffe to convert the network to a caffe model.
-    net_to_xml(net, "lenet.xml");
+    //net_to_xml(net, "lenet.xml");
 }
 catch(std::exception& e)
 {
