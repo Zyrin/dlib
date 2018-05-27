@@ -155,6 +155,7 @@ set (tests
    type_safe_union.cpp
    vectorstream.cpp
    dnn.cpp
+   dnn_optimzations.cpp
    cublas.cpp
    find_optimal_parameters.cpp
    elastic_net.cpp

@@ -492,7 +492,20 @@ namespace dlib
         );
 
     // -----------------------------------------------------------------------------------
-
+        namespace detail
+        {
+            void img2col(
+              matrix<float>& output,
+              const tensor& data,
+              long n,
+              long filter_nr,
+              long filter_nc,
+              long stride_y,
+              long stride_x,
+              long padding_y,
+              long padding_x
+            );
+        }
     } 
 }
 

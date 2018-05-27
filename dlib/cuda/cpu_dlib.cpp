@@ -219,6 +219,62 @@ namespace dlib
 
     // ------------------------------------------------------------------------------------
 
+        inline void add_same_dimension(tensor& dest, const tensor& src)
+        {
+            float* d = dest.host();
+            const float* s = src.host();
+            const float* d_end = d + dest.size();
+            for(; d < d_end; ++d, ++s)
+                *d += *s;
+        }
+
+        inline void add_k(tensor& dest, const tensor& src)
+        {
+            float* d = dest.host();
+            const float* s = src.host();
+            for(long long n = 0; n < dest.num_samples(); ++n)
+            {
+                s = src.host();
+                for(long k = 0; k < dest.k(); ++k, ++s)
+                {
+                    const size_t rxc = dest.nr() * dest.nc();
+                    const float* d_end = d + rxc;
+                    for(; d < d_end; ++d)
+                    {
+                        *d += *s;
+                    }
+                }
+            }
+        }
+
+        inline void add(tensor& dest, const tensor& src)
+        {
+            float* d = dest.host();
+            const float* s = src.host();
+            for(long n = 0; n < dest.num_samples(); ++n)
+            {
+                const auto sn = src.num_samples() == 1 ? 0 : n;
+                const auto nk = sn * src.k();
+                for(long k = 0; k < dest.k(); ++k)
+                {
+                    const auto sk = src.k() == 1 ? 0 : k;
+                    const auto nkr = (nk + sk) * src.nr();
+                    for(long r = 0; r < dest.nr(); ++r)
+                    {
+                        const auto sr = src.nr() == 1 ? 0 : r;
+                        const auto nkrc = (nkr + sr) * src.nc();
+                        for(long c = 0; c < dest.nc(); ++c, ++d)
+                        {
+                            const auto sc = src.nc() == 1 ? 0 : c;
+
+                            const auto s_idx = nkrc + sc;
+                            *d += s[s_idx];
+                        }
+                    }
+                }
+            }
+        }
+
         void add(
             float beta,
             tensor& dest,
@@ -247,27 +303,45 @@ namespace dlib
             if (beta == 0 && alpha == 0)
             {
                 dest = 0;
-                return;
             }
-
-            auto d = dest.host();
-            auto s = src.host();
-            for (long n = 0; n < dest.num_samples(); ++n)
+            else if (beta == 1 && alpha == 1)
             {
-                const auto sn = src.num_samples()==1 ? 0:n;
-                for (long k = 0; k < dest.k(); ++k)
+                if(have_same_dimensions(dest, src))
                 {
-                    const auto sk = src.k()==1 ? 0:k;
-                    for (long r = 0; r < dest.nr(); ++r)
+                    add_same_dimension(dest, src);
+                }
+                else if(src.num_samples() == 1 && src.k() == dest.k() && src.nr() == 1 && src.nc() == 1)
+                {
+                    add_k(dest, src);
+                }
+                else
+                {
+                    add(dest, src);
+                }
+            }
+            else
+            {
+                auto d = dest.host();
+                auto s = src.host();
+                for(long n = 0; n < dest.num_samples(); ++n)
+                {
+                    const auto sn = src.num_samples() == 1 ? 0 : n;
+                    const auto nk = sn * src.k();
+                    for(long k = 0; k < dest.k(); ++k)
                     {
-                        const auto sr = src.nr()==1 ? 0:r;
-                        for (long c = 0; c < dest.nc(); ++c)
+                        const auto sk = src.k() == 1 ? 0 : k;
+                        const auto nkr = (nk + sk) * src.nr();
+                        for(long r = 0; r < dest.nr(); ++r)
                         {
-                            const auto sc = src.nc()==1 ? 0:c;
+                            const auto sr = src.nr() == 1 ? 0 : r;
+                            const auto nkrc = (nkr + sr) * src.nc();
+                            for(long c = 0; c < dest.nc(); ++c, ++d)
+                            {
+                                const auto sc = src.nc() == 1 ? 0 : c;
 
-                            const auto s_idx = ((sn*src.k() + sk)*src.nr() + sr)*src.nc() + sc;
-                            *d = beta*(*d) + alpha*s[s_idx];
-                            ++d;
+                                const auto s_idx = nkrc + sc;
+                                *d = beta * (*d) + alpha * s[s_idx];
+                            }
                         }
                     }
                 }
@@ -290,8 +364,13 @@ namespace dlib
             if (have_same_dimensions(dest, src1) &&
                 have_same_dimensions(dest, src2))
             {
-                for (size_t i = 0; i < dest.size(); ++i)
-                    d[i] = s1[i] + s2[i];
+
+                float* d = dest.host();
+                const float* s1 = src1.host();
+                const float* s2 = src2.host();
+                const float* d_end = d + dest.size();
+                for(; d < d_end; ++d, ++s1, ++s2)
+                    *d = *s1 + *s2;
                 return;
             }
 
@@ -1780,22 +1859,25 @@ namespace dlib
             const long y_offset = window_height/2 - padding_y;
             if (does_max_pooling())
             {
+                const long long rc = dest.nr() * dest.nc();
                 for (long n = 0; n < dest.num_samples(); ++n)
                 {
+                    const long long nk = n * dest.k();
                     for (long k = 0; k < dest.k(); ++k)
                     {
-                        auto simg = image_plane(src,n,k);
-                        auto dimg = d + (n*dest.k() + k)*dest.nr()*dest.nc();
+                        auto simg = image_plane(src, n, k);
+                        auto dimg = d + (nk + k) * rc;
 
                         for (long r = 0; r < dest.nr(); ++r)
                         {
-                            for (long c = 0; c < dest.nc(); ++c)
+                            const long y = r * stride_y + y_offset;
+                            for (long c = 0; c < dest.nc(); ++c, ++dimg)
                             {
-                                auto win = centered_rect(c*stride_x+x_offset,
-                                    r*stride_y+y_offset,
+                                const long x = c * stride_x + x_offset;
+                                const auto win = centered_rect(x, y,
                                     window_width,
                                     window_height);
-                                dimg[r*dest.nc() + c] = max(subm_clipped(simg,win));
+                                *dimg = max(subm_clipped(simg,win));
                             }
                         }
                     }
@@ -1912,53 +1994,55 @@ namespace dlib
     // ------------------------------------------------------------------------------------
     // ------------------------------------------------------------------------------------
     // ------------------------------------------------------------------------------------
-
-        void img2col(
-            matrix<float>& output,
-            const tensor& data,
-            long n,
-            long filter_nr,
-            long filter_nc,
-            long stride_y,
-            long stride_x,
-            long padding_y,
-            long padding_x
-        )
+        namespace detail
         {
-            const auto d = data.host() + data.k()*data.nr()*data.nc()*n;
-            const rectangle boundary = get_rect(data);
-
-            const long out_nr = 1+(data.nr()+2*padding_y-filter_nr)/stride_y;
-            const long out_nc = 1+(data.nc()+2*padding_x-filter_nc)/stride_x;
-
-            output.set_size(out_nr*out_nc, 
-                            data.k()*filter_nr*filter_nc);
-            DLIB_CASSERT(output.size() != 0);
-            float* t = &output(0,0);
-
-            // now fill in the Toeplitz output matrix for the n-th sample in data.  
-            size_t cnt = 0;
-            const long max_r = data.nr() + padding_y-(filter_nr-1);
-            const long max_c = data.nc() + padding_x-(filter_nc-1);
-            for (long r = -padding_y; r < max_r; r+=stride_y)
+            void img2col(
+                matrix<float>& output,
+                const tensor& data,
+                long n,
+                long filter_nr,
+                long filter_nc,
+                long stride_y,
+                long stride_x,
+                long padding_y,
+                long padding_x
+            )
             {
-                for (long c = -padding_x; c < max_c; c+=stride_x)
+                const auto d = data.host() + data.k()*data.nr()*data.nc()*n;
+                const rectangle boundary = get_rect(data);
+
+                const long out_nr = 1 + (data.nr() + 2 * padding_y - filter_nr) / stride_y;
+                const long out_nc = 1 + (data.nc() + 2 * padding_x - filter_nc) / stride_x;
+
+                output.set_size(out_nr*out_nc, data.k() * filter_nr * filter_nc);
+                DLIB_CASSERT(output.size() != 0);
+                float* t = &output(0,0);
+
+                // now fill in the Toeplitz output matrix for the n-th sample in data.  
+                DLIB_IF_ASSERT(size_t cnt = 0);
+                const long max_r = data.nr() + padding_y-(filter_nr-1);
+                const long max_c = data.nc() + padding_x-(filter_nc-1);
+                for (long r = -padding_y; r < max_r; r+=stride_y)
                 {
-                    for (long k = 0; k < data.k(); ++k)
+                    for (long c = -padding_x; c < max_c; c+=stride_x)
                     {
-                        for (long y = 0; y < filter_nr; ++y)
+                        for (long k = 0; k < data.k(); ++k)
                         {
-                            for (long x = 0; x < filter_nc; ++x)
+                            const auto knr = k * data.nr();
+                            const long yEnd = filter_nr + r;
+                            for (long y = r; y < yEnd; ++y)
                             {
-                                DLIB_ASSERT(cnt < output.size());
-                                long xx = c+x;
-                                long yy = r+y;
-                                if (boundary.contains(xx,yy))
-                                    *t = d[(k*data.nr() + yy)*data.nc() + xx];
-                                else
-                                    *t = 0;
-                                ++t;
-                                ++cnt;
+                                auto destPtr = &d[(knr + y)*data.nc() + c];
+                                const long xEnd = filter_nc + c;
+                                for (long x = c; x < xEnd; ++x, ++destPtr, ++t)
+                                {
+                                    DLIB_ASSERT(cnt < output.size());
+                                    if (boundary.contains(x, y))
+                                        *t = *destPtr;
+                                    else
+                                        *t = 0;
+                                    DLIB_IF_ASSERT(++cnt);
+                                }
                             }
                         }
                     }
@@ -2049,7 +2133,7 @@ namespace dlib
             matrix<float> temp;
             for (long n = 0; n < data.num_samples(); ++n)
             {
-                img2col(temp, data, n, filters.nr(), filters.nc(), last_stride_y, last_stride_x, last_padding_y, last_padding_x);
+                detail::img2col(temp, data, n, filters.nr(), filters.nc(), last_stride_y, last_stride_x, last_padding_y, last_padding_x);
 
                 if (add_to_output)
                     output.add_to_sample(n, mat(filters)*trans(temp));
@@ -2101,7 +2185,7 @@ namespace dlib
                               gradient_input.nr()*gradient_input.nc());
 
 
-                img2col(temp, data, n, filters_gradient.nr(), filters_gradient.nc(), last_stride_y, last_stride_x, last_padding_y, last_padding_x);
+                detail::img2col(temp, data, n, filters_gradient.nr(), filters_gradient.nc(), last_stride_y, last_stride_x, last_padding_y, last_padding_x);
                 if (n == 0)
                 {
                     if (add_to_output)
