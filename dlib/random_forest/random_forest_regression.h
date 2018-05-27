@@ -420,7 +420,7 @@ namespace dlib
                 // pick a random bootstrap of the data.
                 std::vector<std::pair<float,uint32_t>> idxs(y.size());
                 for (auto& idx : idxs)
-                    idx = std::make_pair(0,rnd.get_integer(y.size()));
+                    idx = std::make_pair(0.f,rnd.get_integer(y.size()));
 
                 // We are going to use ranges_to_process as a stack that tracks which
                 // range of samples we are going to split next.
