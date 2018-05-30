@@ -2009,12 +2009,11 @@ namespace dlib
             )
             {
                 const auto d = data.host() + data.k()*data.nr()*data.nc()*n;
-                const rectangle boundary = get_rect(data);
 
                 const long out_nr = 1 + (data.nr() + 2 * padding_y - filter_nr) / stride_y;
                 const long out_nc = 1 + (data.nc() + 2 * padding_x - filter_nc) / stride_x;
 
-                output.set_size(out_nr*out_nc, data.k() * filter_nr * filter_nc);
+                output.set_size(out_nr * out_nc, data.k() * filter_nr * filter_nc);
                 DLIB_CASSERT(output.size() != 0);
                 float* t = &output(0,0);
 
@@ -2032,16 +2031,29 @@ namespace dlib
                             const long yEnd = filter_nr + r;
                             for (long y = r; y < yEnd; ++y)
                             {
-                                auto destPtr = &d[(knr + y)*data.nc() + c];
                                 const long xEnd = filter_nc + c;
-                                for (long x = c; x < xEnd; ++x, ++destPtr, ++t)
+                                if (y < 0 || y >= data.nr())
                                 {
                                     DLIB_ASSERT(cnt < output.size());
-                                    if (boundary.contains(x, y))
-                                        *t = *destPtr;
-                                    else
-                                        *t = 0;
-                                    DLIB_IF_ASSERT(++cnt);
+                                    const long elementsInRow = xEnd - c;
+                                    DLIB_ASSERT(cnt + elementsInRow <= output.size());
+                                    memset(t, 0, elementsInRow * sizeof(float));
+                                    t += elementsInRow;
+                                    DLIB_IF_ASSERT(cnt += elementsInRow);
+                                }
+                                else
+                                {
+                                    auto dataPtr = &d[(knr + y) * data.nc() + c];
+                                    const long xEnd = filter_nc + c;
+                                    for (long x = c; x < xEnd; ++x, ++dataPtr, ++t)
+                                    {
+                                        DLIB_ASSERT(cnt < output.size());
+                                        if (x >= 0 && x < data.nc())
+                                            *t = *dataPtr;
+                                        else
+                                            *t = 0;
+                                        DLIB_IF_ASSERT(++cnt);
+                                    }
                                 }
                             }
                         }
