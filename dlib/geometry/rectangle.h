@@ -367,12 +367,9 @@ namespace dlib
         unsigned long height
     )
     {
-        rectangle result;
-        result.set_left ( x - static_cast<long>(width) / 2 );
-        result.set_top ( y - static_cast<long>(height) / 2 );
-        result.set_right ( result.left() + width - 1 );
-        result.set_bottom ( result.top() + height - 1 );
-        return result;
+        const long left = x - static_cast<long>(width) / 2;
+        const long top = y - static_cast<long>(height) / 2;
+        return rectangle(left, top, left + width - 1, top + height - 1);
     }
 
 // ----------------------------------------------------------------------------------------

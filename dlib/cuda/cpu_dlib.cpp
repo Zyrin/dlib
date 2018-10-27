@@ -1823,6 +1823,62 @@ namespace dlib
             do_max_pooling = false;
         }
 
+
+        struct max_op
+        {
+          template<typename EXP>
+          static typename matrix_exp<EXP>::type run(const matrix_exp<EXP>& m)
+          {
+            return max(m);
+          }
+        };
+
+        struct mean_op
+        {
+          template<typename EXP>
+          static typename matrix_exp<EXP>::type run(const matrix_exp<EXP>& m)
+          {
+            return mean(m);
+          }
+        };
+
+        template<typename op>
+        void doPooling(resizable_tensor& dest, const tensor& src,
+          int window_height, int window_width,
+          int stride_y, int stride_x,
+          int padding_y, int padding_x)
+        {
+          float* d = dest.host();
+          const long width_2 = window_width / 2;
+          const long height_2 = window_height / 2;
+          const long x_offset = width_2 - padding_x;
+          const long y_offset = height_2 - padding_y;
+          const long long rc = dest.nr() * dest.nc();
+          for(long n = 0; n < dest.num_samples(); ++n)
+          {
+            const long long nk = n * dest.k();
+            for(long k = 0; k < dest.k(); ++k)
+            {
+              auto simg = image_plane(src, n, k);
+              float* dimg = d + (nk + k) * rc;
+              rectangle win;
+              for(long r = 0; r < dest.nr(); ++r)
+              {
+                const long y = r * stride_y + y_offset;
+                win.set_top(y - height_2);
+                win.set_bottom(win.top() + window_height - 1);
+                for(long c = 0; c < dest.nc(); ++c, ++dimg)
+                {
+                  const long x = c * stride_x + x_offset;
+                  win.set_left(x - width_2);
+                  win.set_right(win.left() + window_width - 1);
+                  *dimg = op::run(subm_clipped(simg, win));
+                }
+              }
+            }
+          }
+        }
+
         void pooling::
         operator() (
             resizable_tensor& dest,
@@ -1852,61 +1908,14 @@ namespace dlib
                 dest = 0;
                 return;
             }
-
-
-            auto d = dest.host();
-            const long x_offset = window_width/2 - padding_x;
-            const long y_offset = window_height/2 - padding_y;
             if (does_max_pooling())
             {
-                const long long rc = dest.nr() * dest.nc();
-                for (long n = 0; n < dest.num_samples(); ++n)
-                {
-                    const long long nk = n * dest.k();
-                    for (long k = 0; k < dest.k(); ++k)
-                    {
-                        auto simg = image_plane(src, n, k);
-                        auto dimg = d + (nk + k) * rc;
-
-                        for (long r = 0; r < dest.nr(); ++r)
-                        {
-                            const long y = r * stride_y + y_offset;
-                            for (long c = 0; c < dest.nc(); ++c, ++dimg)
-                            {
-                                const long x = c * stride_x + x_offset;
-                                const auto win = centered_rect(x, y,
-                                    window_width,
-                                    window_height);
-                                *dimg = max(subm_clipped(simg,win));
-                            }
-                        }
-                    }
-                }
+              doPooling<max_op>(dest, src, window_height, window_width, stride_y, stride_x, padding_y, padding_x);
             }
             else
             {
-                for (long n = 0; n < dest.num_samples(); ++n)
-                {
-                    for (long k = 0; k < dest.k(); ++k)
-                    {
-                        auto simg = image_plane(src,n,k);
-                        auto dimg = d + (n*dest.k() + k)*dest.nr()*dest.nc();
-
-                        for (long r = 0; r < dest.nr(); ++r)
-                        {
-                            for (long c = 0; c < dest.nc(); ++c)
-                            {
-                                auto win = centered_rect(c*stride_x+x_offset,
-                                    r*stride_y+y_offset,
-                                    window_width,
-                                    window_height);
-                                dimg[r*dest.nc() + c] = mean(subm_clipped(simg,win));
-                            }
-                        }
-                    }
-                }
+              doPooling<mean_op>(dest, src, window_height, window_width, stride_y, stride_x, padding_y, padding_x);
             }
-
         }
 
         void pooling::get_gradient(
