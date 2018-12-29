@@ -70,11 +70,11 @@ int main(int argc, char** argv) try
     // is largest then the predicted digit is 9.  
     using net_type = loss_multiclass_log<
                                 fc<10,        
-                                relu<fc<84,   
-                                relu<fc<120,  
-                                max_pool<2,2,2,2,relu<con<16,5,5,1,1,
-                                max_pool<2,2,2,2,relu<con<6,5,5,1,1,
-                                input<matrix<unsigned char>> 
+                                prelu<fc<84,//dropout<
+                                prelu<fc<120,//dropout<
+                                max_pool<2,2,2,2,prelu<con<16,5,5,1,1,
+                                max_pool<2,2,2,2,prelu<con<6,5,5,1,1,
+                                input<matrix<unsigned char>>
                                 >>>>>>>>>>>>;
     // This net_type defines the entire network architecture.  For example, the block
     // relu<fc<84,SUBNET>> means we take the output from the subnetwork, pass it through a
@@ -100,7 +100,7 @@ int main(int argc, char** argv) try
     // from scratch.  This is because, when the program restarts, this call to
     // set_synchronization_file() will automatically reload the settings from mnist_sync if
     // the file exists.
-    trainer.set_synchronization_file("mnist_sync", std::chrono::seconds(20));
+    //trainer.set_synchronization_file("mnist_sync", std::chrono::seconds(20));
     // Finally, this line begins training.  By default, it runs SGD with our specified
     // learning rate until the loss stops decreasing.  Then it reduces the learning rate by
     // a factor of 10 and continues running until the loss stops decreasing again.  It will

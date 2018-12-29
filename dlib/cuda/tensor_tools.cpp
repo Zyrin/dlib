@@ -853,6 +853,35 @@ namespace dlib { namespace tt
 #endif
     }
 
+    // ----------------------------------------------------------------------------------------
+
+    void lrelu(
+      tensor& dest,
+      const tensor& src,
+      float alpha
+    )
+    {
+#ifdef DLIB_USE_CUDA
+      cuda::lrelu(dest, src, alpha);
+#else
+      cpu::lrelu(dest, src, alpha);
+#endif
+    }
+
+    void lrelu_gradient(
+      tensor& grad,
+      const tensor& dest,
+      const tensor& gradient_input,
+      float alpha
+    )
+    {
+#ifdef DLIB_USE_CUDA
+      cuda::lrelu_gradient(grad, dest, gradient_input, alpha);
+#else
+      cpu::lrelu_gradient(grad, dest, gradient_input, alpha);
+#endif
+    }
+
 // ----------------------------------------------------------------------------------------
 
     void prelu (

@@ -2570,9 +2570,83 @@ namespace dlib
         resizable_tensor params;
     };
 
-
     template <typename SUBNET>
     using relu = add_layer<relu_, SUBNET>;
+
+    // ----------------------------------------------------------------------------------------
+
+    class lrelu_
+    {
+    public:
+      explicit lrelu_(
+        float alpha = 0.01
+      ) :
+        alpha(alpha)
+      {}
+
+      template <typename SUBNET>
+      void setup(const SUBNET& /*sub*/)
+      {}
+
+      void forward_inplace(const tensor& input, tensor& output)
+      {
+        tt::lrelu(output, input, alpha);
+      }
+
+      template <typename SUBNET>
+      void backward(
+        const tensor& gradient_input,
+        SUBNET& sub,
+        tensor& params_grad
+      )
+      {
+        tt::lrelu_gradient(sub.get_gradient_input(), sub.get_output(),
+          gradient_input, params, params_grad);
+      }
+
+      inline dpoint map_input_to_output(const dpoint& p) const { return p; }
+      inline dpoint map_output_to_input(const dpoint& p) const { return p; }
+
+      const tensor& get_layer_params() const { return params; }
+      tensor& get_layer_params() { return params; }
+
+      friend void serialize(const lrelu_& item, std::ostream& out)
+      {
+        serialize("lrelu_", out);
+        serialize(item.alpha, out);
+      }
+
+      friend void deserialize(lrelu_& item, std::istream& in)
+      {
+        std::string version;
+        deserialize(version, in);
+        if(version != "lrelu_")
+          throw serialization_error("Unexpected version '" + version + "' found while deserializing dlib::lrelu_.");
+        deserialize(item.alpha, in);
+      }
+
+      friend std::ostream& operator<<(std::ostream& out, const lrelu_& item)
+      {
+        out << "lrelu\t ("
+          << "alpha=" << item.alpha
+          << ")";
+        return out;
+      }
+
+      friend void to_xml(const lrelu_& item, std::ostream& out)
+      {
+        out << "<lrelu alpha='" << item.alpha << "'>\n";
+        out << "</lrelu>\n";
+      }
+
+    private:
+      resizable_tensor params;
+      float alpha;
+    };
+
+    template <typename SUBNET>
+    using lrelu = add_layer<lrelu_, SUBNET>;
+
 
 // ----------------------------------------------------------------------------------------
 

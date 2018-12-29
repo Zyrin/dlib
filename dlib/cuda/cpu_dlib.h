@@ -283,15 +283,30 @@ namespace dlib
 
     // ------------------------------------------------------------------------------------
 
-        void relu (
-            tensor& dest,
-            const tensor& src
+        void relu(
+          tensor& dest,
+          const tensor& src
         );
 
-        void relu_gradient (
-            tensor& grad,
-            const tensor& dest,
-            const tensor& gradient_input
+        void relu_gradient(
+          tensor& grad,
+          const tensor& dest,
+          const tensor& gradient_input
+        );
+
+    // ------------------------------------------------------------------------------------
+
+        void lrelu(
+          tensor& dest,
+          const tensor& src,
+          float alpha
+        );
+
+        void lrelu_gradient(
+          tensor& grad,
+          const tensor& src,
+          const tensor& gradient_input,
+          float alpha
         );
 
     // ----------------------------------------------------------------------------------------

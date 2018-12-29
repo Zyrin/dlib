@@ -1506,6 +1506,49 @@ namespace dlib
             }
         }
 
+    // ------------------------------------------------------------------------------------
+
+        void lrelu(
+          tensor& dest,
+          const tensor& src,
+          float alpha
+        )
+        {
+          const float* s = src.host();
+          float* d = dest.host();
+          for(size_t i = 0; i < dest.size(); ++i)
+          {
+            if(s[i] > 0)
+              d[i] = s[i];
+            else
+              d[i] = alpha * s[i];
+          }
+        }
+
+        void lrelu_gradient(
+          tensor& grad,
+          const tensor& dest,
+          const tensor& gradient_input,
+          float alpha
+        )
+        {
+          // TODO same object
+          const float* gi = gradient_input.host();
+          const float* s = dest.host();
+          float* out = grad.host();
+          for(size_t i = 0; i < dest.size(); ++i)
+          {
+            if(s[i] > 0)
+            {
+              out[i] += gi[i];
+            }
+            else
+            {
+              out[i] += alpha * gi[i];
+            }
+          }
+        }
+
     // ----------------------------------------------------------------------------------------
 
         void prelu (
